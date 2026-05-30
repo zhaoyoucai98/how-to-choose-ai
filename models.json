@@ -1,0 +1,122 @@
+const MODELS = [
+  {
+    name: "Claude Mythos",
+    vendor: "Anthropic",
+    vendorColor: "purple",
+    score: 99,
+    pricePerM: 42.00,
+    context: "200K",
+    params: "未公开",
+    tags: ["最强综合", "推理满分", "编程", "多语言", "企业级"],
+    strengths: { reasoning: 100, coding: 95, knowledge: 98, multilingual: 99, math: 97, multimodal: 92 },
+    releaseDate: "2026-02"
+  },
+  {
+    name: "Gemini 3.1 Pro",
+    vendor: "Google",
+    vendorColor: "blue",
+    score: 92,
+    pricePerM: 10.50,
+    context: "2000K",
+    params: "未公开",
+    tags: ["多模态王者", "超长文本", "多模态", "编程", "Agent"],
+    strengths: { reasoning: 91, coding: 93, knowledge: 94, multilingual: 90, math: 88, multimodal: 98 },
+    releaseDate: "2026-03"
+  },
+  {
+    name: "Qwen3.7 Max",
+    vendor: "阿里",
+    vendorColor: "amber",
+    score: 92,
+    pricePerM: 5.80,
+    context: "1000K",
+    params: "未公开",
+    tags: ["中国最强", "国产开源", "中文", "编程", "Agent"],
+    strengths: { reasoning: 90, coding: 92, knowledge: 91, multilingual: 93, math: 89, multimodal: 88 },
+    releaseDate: "2026-05"
+  },
+  {
+    name: "GPT-5.5",
+    vendor: "OpenAI",
+    vendorColor: "green",
+    score: 91,
+    pricePerM: 42.00,
+    context: "128K",
+    params: "未公开",
+    tags: ["生态最成熟", "知识面广", "编程", "写作", "翻译"],
+    strengths: { reasoning: 90, coding: 92, knowledge: 96, multilingual: 89, math: 95, multimodal: 85 },
+    releaseDate: "2026-03"
+  },
+  {
+    name: "Claude Opus 4.7",
+    vendor: "Anthropic",
+    vendorColor: "purple",
+    score: 90,
+    pricePerM: 76.00,
+    context: "200K",
+    params: "未公开",
+    tags: ["编程专精", "推理强者", "编程", "长文本", "法律"],
+    strengths: { reasoning: 93, coding: 95, knowledge: 90, multilingual: 88, math: 91, multimodal: 82 },
+    releaseDate: "2025-12"
+  },
+  {
+    name: "DeepSeek V4 Pro",
+    vendor: "DeepSeek",
+    vendorColor: "coral",
+    score: 88,
+    pricePerM: 3.48,
+    context: "1000K",
+    params: "1.6T MoE",
+    tags: ["全球性价比王", "中文最强", "编程", "长文本", "国产开源"],
+    strengths: { reasoning: 88, coding: 93, knowledge: 86, multilingual: 92, math: 85, multimodal: 80 },
+    releaseDate: "2026-05"
+  },
+  {
+    name: "Kimi K2.5",
+    vendor: "Moonshot",
+    vendorColor: "pink",
+    score: 84,
+    pricePerM: 5.20,
+    context: "500K",
+    params: "未公开",
+    tags: ["中文写作", "长文生成", "中文写作", "摘要", "翻译"],
+    strengths: { reasoning: 82, coding: 78, knowledge: 85, multilingual: 90, math: 80, multimodal: 75 },
+    releaseDate: "2026-04"
+  },
+  {
+    name: "Gemini 3.5 Flash",
+    vendor: "Google",
+    vendorColor: "blue",
+    score: 83,
+    pricePerM: 0.65,
+    context: "1000K",
+    params: "未公开",
+    tags: ["极速推理", "Agent场景", "Agent", "多模态", "批量处理"],
+    strengths: { reasoning: 80, coding: 81, knowledge: 82, multilingual: 83, math: 80, multimodal: 92 },
+    releaseDate: "2026-05"
+  },
+  {
+    name: "Llama 4 Maverick",
+    vendor: "Meta",
+    vendorColor: "gray",
+    score: 82,
+    pricePerM: 0.60,
+    context: "128K",
+    params: "400B MoE",
+    tags: ["开源标杆", "低成本", "开源", "研究", "微调"],
+    strengths: { reasoning: 80, coding: 82, knowledge: 84, multilingual: 78, math: 83, multimodal: 82 },
+    releaseDate: "2025-07"
+  },
+  {
+    name: "豆包 Pro",
+    vendor: "字节",
+    vendorColor: "teal",
+    score: 80,
+    pricePerM: 2.00,
+    context: "128K",
+    params: "未公开",
+    tags: ["国产低价", "中文日常", "中文", "聊天", "创作"],
+    strengths: { reasoning: 78, coding: 75, knowledge: 82, multilingual: 86, math: 77, multimodal: 76 },
+    releaseDate: "2026-01"
+  }
+];

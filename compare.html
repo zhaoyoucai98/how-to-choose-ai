@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型能力雷达图对比 - LLM Navigator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; }
+  .dim-label { font-size: 12px; font-weight: 500; }
+  .source-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; }
+</style>
+</head>
+<body class="text-gray-900">
+
+<nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+  <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span style="font-size:20px">🧭</span>
+      <span class="font-semibold text-lg text-blue-700">LLM Navigator</span>
+    </div>
+    <div class="hidden md:flex items-center gap-6 text-sm text-gray-600">
+      <a href="index.html" class="hover:text-blue-600">首页</a>
+      <a href="ranking.html" class="hover:text-blue-600">排行榜</a>
+      <a href="compare.html" class="text-blue-600 font-medium">雷达对比</a>
+      <a href="task-agent.html" class="hover:text-blue-600">任务分析</a>
+      <a href="wizard.html" class="hover:text-blue-600">选型向导</a>
+      <a href="calculator.html" class="hover:text-blue-600">成本计算</a>
+    </div>
+    <button class="md:hidden text-gray-600" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </div>
+  <div id="mobile-menu" class="md:hidden hidden bg-white border-t border-gray-100 px-4 py-2">
+    <a href="index.html" class="block py-2 text-sm">首页</a>
+    <a href="ranking.html" class="block py-2 text-sm">排行榜</a>
+    <a href="compare.html" class="block py-2 text-sm text-blue-600 font-medium">雷达对比</a>
+    <a href="task-agent.html" class="block py-2 text-sm">任务分析</a>
+    <a href="wizard.html" class="block py-2 text-sm">选型向导</a>
+    <a href="calculator.html" class="block py-2 text-sm">成本计算</a>
+  </div>
+</nav>
+
+<section class="max-w-6xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-semibold mb-2">大模型 6 维能力雷达图</h1>
+  <p class="text-sm text-gray-500 mb-6" id="data-source">数据来源：后端 API 实时加载…</p>
+
+  <!-- 模型选择器 -->
+  <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+    <div class="text-sm text-gray-500 mb-3">选择要对比的模型（多选，建议2-4个）</div>
+    <div class="flex flex-wrap gap-2" id="model-selector">
+      <div class="text-gray-400 text-sm py-4">加载中…</div>
+    </div>
+    <div class="flex gap-3 mt-4">
+      <button onclick="selectAll()" class="text-xs border border-gray-300 px-3 py-1 rounded hover:bg-gray-50">全选</button>
+      <button onclick="selectTop3()" class="text-xs border border-gray-300 px-3 py-1 rounded hover:bg-gray-50">Top3</button>
+      <button onclick="selectClear()" class="text-xs border border-gray-300 px-3 py-1 rounded hover:bg-gray-50">清除</button>
+    </div>
+  </div>
+
+  <!-- 主雷达图 -->
+  <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+    <h2 class="text-sm font-medium text-gray-500 mb-3">叠合雷达图（已选模型并排对比）</h2>
+    <div style="max-width:560px; margin:0 auto;">
+      <canvas id="mainRadar" height="400"></canvas>
+    </div>
+  </div>
+
+  <!-- 单模型雷达图 -->
+  <h2 class="text-lg font-semibold mb-4">各模型独立雷达图</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8" id="individual-radars">
+    <div class="text-gray-400 text-sm py-4">选择模型后显示…</div>
+  </div>
+
+  <!-- 数据表 -->
+  <h2 class="text-lg font-semibold mb-4">6维度评分表 + 数据来源</h2>
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div style="overflow-x:auto;">
+      <table class="w-full text-sm" id="data-table">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="text-left px-4 py-3 font-medium text-gray-600">模型</th>
+            <th class="px-3 py-3 font-medium text-gray-600">推理</th>
+            <th class="px-3 py-3 font-medium text-gray-600">编程</th>
+            <th class="px-3 py-3 font-medium text-gray-600">知识</th>
+            <th class="px-3 py-3 font-medium text-gray-600">数学</th>
+            <th class="px-3 py-3 font-medium text-gray-600">多语言</th>
+            <th class="px-3 py-3 font-medium text-gray-600">多模态</th>
+            <th class="px-3 py-3 font-medium text-gray-600 text-right">数据来源</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 方法论说明 -->
+  <div class="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-5">
+    <h3 class="font-semibold text-blue-800 mb-2">评分方法论</h3>
+    <div class="text-sm text-blue-700 space-y-2">
+      <p><strong>推理：</strong>ARC-AGI-2 · HLE · GPQA Diamond · LongBench v2</p>
+      <p><strong>编程：</strong>SWE-bench Pro · LiveCodeBench · Terminal-Bench 2.0</p>
+      <p><strong>知识：</strong>MMLU-Pro · HLE · SimpleQA · FrontierScience</p>
+      <p><strong>数学：</strong>AIME 2025 · FrontierMath · MATH-500</p>
+      <p><strong>多语言：</strong>MMLU-ProX · MGSM（含中文场景评测）</p>
+      <p><strong>多模态：</strong>MMMU-Pro · OfficeQA Pro · 视觉分辨率</p>
+      <p class="mt-3 text-xs text-blue-500">注：标注"部分估算"的维度为该模型在 BenchLM 类别中数据缺失，基于 LLM Stats 及同类模型推算。</p>
+    </div>
+  </div>
+</section>
+
+<footer class="border-t border-gray-200 py-8 text-center text-sm text-gray-400">
+  <p>LLM Navigator · 大模型选型助手 · 数据基于 BenchLM / LLM Stats / 官方技术报告</p>
+</footer>
+
+<script>
+// 本地开发用 localhost:8000，Vercel 部署用同域 /api
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:8000'
+  : '';
+
+const colors = [
+  { bg: 'rgba(99,102,241,0.18)', border: '#6366f1' },
+  { bg: 'rgba(34,197,94,0.18)',  border: '#22c55e' },
+  { bg: 'rgba(59,130,246,0.18)', border: '#3b82f6' },
+  { bg: 'rgba(245,158,11,0.18)', border: '#f59e0b' },
+  { bg: 'rgba(236,72,153,0.18)', border: '#ec4899' },
+  { bg: 'rgba(220,38,38,0.18)',  border: '#dc2626' },
+  { bg: 'rgba(20,184,166,0.18)', border: '#14b8a6' },
+  { bg: 'rgba(168,85,247,0.18)', border: '#a855f7' },
+  { bg: 'rgba(100,116,139,0.18)',border: '#64748b' },
+  { bg: 'rgba(239,68,68,0.18)',  border: '#ef4444' }
+];
+
+const dims = ['reasoning','coding','knowledge','math','multilingual','multimodal'];
+const dimLabels = ['推理','编程','知识','数学','多语言','多模态'];
+
+let MODELS = [];
+let selectedModels = new Set(['claude-mythos','gpt-55','deepseek-v4-pro']);
+let mainChart = null;
+
+// ========================
+// 加载模型数据
+// ========================
+async function loadModels() {
+  try {
+    const res = await fetch(`${API_BASE}/api/models`);
+    if (!res.ok) throw new Error('API 请求失败');
+    const json = await res.json();
+    MODELS = json.data || json;
+    document.getElementById('data-source').textContent =
+      '数据来源：后端 API 实时数据 · BenchLM / LLM Stats / 官方技术报告';
+    buildSelector();
+    refreshAll();
+  } catch (err) {
+    console.error('加载模型数据失败:', err);
+    document.getElementById('model-selector').innerHTML =
+      '<div class="text-red-400 text-sm py-4">⚠️ 无法连接后端 API，请确认后端服务已启动。<br><small>本地开发：启动 `cd backend && uvicorn main:app --reload`</small></div>';
+  }
+}
+
+// ========================
+// 模型选择器
+// ========================
+function buildSelector() {
+  const container = document.getElementById('model-selector');
+  container.innerHTML = MODELS.map((m,i) => {
+    const checked = selectedModels.has(m.id) ? 'checked' : '';
+    const badge = i<3 ? ['🥇','🥈','🥉'][i] : '';
+    return `<label class="inline-flex items-center gap-1.5 cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1.5 text-xs transition">
+      <input type="checkbox" value="${m.id}" ${checked} onchange="toggleModel('${m.id}')" class="accent-blue-600">
+      ${badge} ${m.name}
+    </label>`;
+  }).join('');
+}
+
+function toggleModel(id) {
+  if (selectedModels.has(id)) selectedModels.delete(id);
+  else selectedModels.add(id);
+  refreshAll();
+}
+function selectAll() { MODELS.forEach(m => selectedModels.add(m.id)); buildSelector(); refreshAll(); }
+function selectTop3() { selectedModels.clear(); MODELS.slice(0,3).forEach(m => selectedModels.add(m.id)); buildSelector(); refreshAll(); }
+function selectClear() { selectedModels.clear(); buildSelector(); refreshAll(); }
+
+// ========================
+// 主雷达图
+// ========================
+function refreshMainRadar() {
+  const canvasParent = document.getElementById('mainRadar').parentElement;
+  // 重建 canvas（Chart.js 销毁后需要新 canvas）
+  if (mainChart) { mainChart.destroy(); mainChart = null; }
+  document.getElementById('mainRadar').remove();
+  const c = document.createElement('canvas');
+  c.id = 'mainRadar'; c.height = 400;
+  canvasParent.appendChild(c);
+
+  const selected = MODELS.filter(m => selectedModels.has(m.id));
+  if (selected.length === 0) {
+    canvasParent.innerHTML = '<div class="text-center py-16 text-gray-400 text-sm">请在上方选择至少1个模型</div>';
+    return;
+  }
+
+  const datasets = selected.map((m,i) => {
+    const cm = colors[i % colors.length];
+    const sd = (m.strength_reasoning !== undefined)
+      ? [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal]
+      : Object.values(m.strengths || {});
+    return {
+      label: (m.region === '国产' ? '🇨🇳 ' : '🌍 ') + m.name,
+      data: sd,
+      backgroundColor: cm.bg,
+      borderColor: cm.border,
+      borderWidth: 1.5,
+      pointRadius: 3,
+      pointBackgroundColor: cm.border
+    };
+  });
+
+  const ctx = document.getElementById('mainRadar').getContext('2d');
+  mainChart = new Chart(ctx, {
+    type: 'radar',
+    data: { labels: dimLabels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: {
+        r: {
+          beginAtZero: false, min: 40, max: 100,
+          ticks: { stepSize: 10, backdropColor: 'transparent', font: { size: 10 } },
+          pointLabels: { font: { size: 12, weight: '500' } },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      },
+      plugins: { legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyleWidth: 10 } } }
+    }
+  });
+}
+
+// ========================
+// 独立雷达图
+// ========================
+function refreshIndividualRadars() {
+  const container = document.getElementById('individual-radars');
+  const selected = MODELS.filter(m => selectedModels.has(m.id));
+  if (selected.length === 0) {
+    container.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-400 text-sm">选择模型后显示独立雷达图</div>';
+    return;
+  }
+  container.innerHTML = selected.map((m,i) => {
+    const cid = 'ir-' + m.id;
+    return `<div class="bg-white border border-gray-200 rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="font-semibold text-sm text-gray-900">${m.name}</span>
+        <span class="text-xs text-gray-400">${m.vendor}</span>
+        <span class="text-xs ml-auto" style="color:${colors[i%colors.length].border}">综合 ${m.score}</span>
+      </div>
+      <div style="max-width:260px; margin:0 auto;">
+        <canvas id="${cid}" height="220"></canvas>
+      </div>
+    </div>`;
+  }).join('');
+
+  selected.forEach((m,i) => {
+    const cm = colors[i % colors.length];
+    const sd = (m.strength_reasoning !== undefined)
+      ? [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal]
+      : Object.values(m.strengths || {});
+    new Chart(document.getElementById('ir-'+m.id), {
+      type: 'radar',
+      data: { labels: dimLabels, datasets: [{ data: sd, backgroundColor: cm.bg, borderColor: cm.border, borderWidth: 1.5, pointRadius: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        scales: { r: { beginAtZero: false, min: 40, max: 100, ticks: { stepSize: 20, font: { size: 9 }, backdropColor: 'transparent' }, pointLabels: { font: { size: 9 } }, grid: { color: 'rgba(0,0,0,0.06)' } } },
+        plugins: { legend: { display: false } }
+      }
+    });
+  });
+}
+
+// ========================
+// 数据表
+// ========================
+function refreshTable() {
+  const tbody = document.querySelector('#data-table tbody');
+  tbody.innerHTML = MODELS.map((m,i) => {
+    const sd = (m.strength_reasoning !== undefined)
+      ? [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal]
+      : Object.values(m.strengths || {});
+    const maxVals = dims.map((_,j) => Math.max(...MODELS.map(x => {
+      return (x.strength_reasoning !== undefined)
+        ? [x.strength_reasoning, x.strength_coding, x.strength_knowledge, x.strength_math, x.strength_multilingual, x.strength_multimodal][j]
+        : Object.values(x.strengths || {})[j] || 0;
+    }));
+    const vals = sd.map((v,j) => {
+      const isMax = v === maxVals[j];
+      return `<td class="px-3 py-2 text-center ${isMax ? 'font-semibold text-blue-600' : 'text-gray-700'}">${v}${isMax?' ★':''}</td>`;
+    });
+    const srcLabel = (m.data_source || '').includes('估算')
+      ? '<span class="source-badge bg-yellow-100 text-yellow-700">部分估算</span>'
+      : '<span class="source-badge bg-green-100 text-green-700">BenchLM</span>';
+    const regionIcon = m.region === '国产' ? '🇨🇳' : '🌍';
+    return `<tr class="border-t border-gray-100 ${selectedModels.has(m.id) ? 'bg-blue-50/50' : ''}">
+      <td class="px-4 py-2 font-medium text-gray-900">${regionIcon} ${m.name}<br><span class="text-xs text-gray-400">${m.vendor}</span></td>
+      ${vals.join('')}
+      <td class="px-3 py-2 text-right text-xs text-gray-400">${srcLabel}</td>
+    </tr>`;
+  }).join('');
+}
+
+function refreshAll() {
+  refreshMainRadar();
+  refreshIndividualRadars();
+  refreshTable();
+}
+
+loadModels();
+</script>
+</body>
+</html>

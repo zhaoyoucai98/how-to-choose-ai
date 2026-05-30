@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任务分析智能体 - LLM Navigator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .card { transition: transform 0.15s, box-shadow 0.15s; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .preset-btn { transition: all 0.15s; }
+    .preset-btn:hover { transform: translateY(-1px); }
+    input[type="range"] { -webkit-appearance: none; height: 6px; border-radius: 3px; background: #e5e7eb; outline: none; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #185FA5; cursor: pointer; }
+    .result-row { transition: background 0.15s; }
+    .result-row:hover { background: #f0f7ff; }
+    .bar-fill { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    .region-option { transition: all 0.15s; cursor: pointer; }
+    .region-option:hover { transform: translateY(-1px); }
+    .region-option.checked { box-shadow: 0 0 0 2px #185FA5; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+  <!-- 导航栏 -->
+  <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span style="font-size:20px">🧭</span>
+        <span class="font-semibold text-lg text-blue-700">LLM Navigator</span>
+      </div>
+      <div class="hidden md:flex items-center gap-6 text-sm text-gray-600">
+        <a href="index.html" class="hover:text-blue-600">首页</a>
+        <a href="ranking.html" class="hover:text-blue-600">排行榜</a>
+        <a href="compare.html" class="hover:text-blue-600">雷达对比</a>
+        <a href="task-agent.html" class="text-blue-600 font-semibold">任务分析</a>
+        <a href="wizard.html" class="hover:text-blue-600">选型向导</a>
+        <a href="calculator.html" class="hover:text-blue-600">成本计算</a>
+      </div>
+      <button id="menu-btn" class="md:hidden text-gray-600" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="md:hidden hidden bg-white border-t border-gray-100 px-4 py-2">
+      <a href="index.html" class="block py-2 text-sm text-gray-600">首页</a>
+      <a href="ranking.html" class="block py-2 text-sm text-gray-600">排行榜</a>
+      <a href="compare.html" class="block py-2 text-sm text-gray-600">雷达对比</a>
+      <a href="task-agent.html" class="block py-2 text-sm text-blue-600 font-semibold">任务分析</a>
+      <a href="wizard.html" class="block py-2 text-sm text-gray-600">选型向导</a>
+      <a href="calculator.html" class="block py-2 text-sm text-gray-600">成本计算</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
+    <div class="max-w-4xl mx-auto px-4 py-12 text-center">
+      <div class="text-5xl mb-4">🤖</div>
+      <h1 class="text-3xl md:text-4xl font-bold mb-3">AI 任务分析智能体</h1>
+      <p class="text-lg text-blue-100 max-w-2xl mx-auto">告诉我你要做什么，我分析任务的能力需求，<br>结合全网大模型数据、价格、以及国产/海外适用性，给你最优选型推荐。</p>
+    </div>
+  </div>
+
+  <div class="max-w-5xl mx-auto px-4 py-8">
+
+    <!-- 步骤1：任务输入 -->
+    <div class="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-7 h-7 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-bold">1</span>
+        <h2 class="text-lg font-semibold">描述你的任务</h2>
+      </div>
+      <textarea id="taskInput" rows="3" placeholder="例如：我想写一个Python爬虫，每天抓取A股实时行情数据，分析涨跌幅，自动生成日报发送到企业微信..."
+        class="w-full border border-gray-300 rounded-lg p-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+        oninput="onTaskInput()"></textarea>
+
+      <div class="mt-4">
+        <span class="text-xs text-gray-500 font-medium mb-2 block">💡 快捷任务模板（点击自动填充）：</span>
+        <div class="flex flex-wrap gap-2" id="presetContainer"></div>
+      </div>
+    </div>
+
+    <!-- 步骤2：模型来源偏好 -->
+    <div class="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-7 h-7 rounded-full bg-orange-500 text-white text-sm flex items-center justify-center font-bold">2</span>
+        <h2 class="text-lg font-semibold">模型来源偏好</h2>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 ml-2" id="regionAutoBadge" style="display:none">自动判断中</span>
+      </div>
+      <p class="text-sm text-gray-500 mb-4">这不是"哪个更强"的问题，而是<strong>哪个更适合你的场景</strong>——网络环境、数据合规、中文能力、审查要求，都影响选型。</p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="regionOptions"></div>
+      <p id="regionHint" class="text-xs text-gray-500 mt-3"></p>
+    </div>
+
+    <!-- 步骤3：能力权重 -->
+    <div class="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-7 h-7 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-bold">3</span>
+        <h2 class="text-lg font-semibold">能力需求占比（可拖动调节）</h2>
+        <span class="text-xs text-gray-400 ml-auto" id="weightSum">合计: 100%</span>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4" id="slidersContainer"></div>
+
+      <!-- 权重分布柱状图 -->
+      <div class="mt-6">
+        <canvas id="weightChart" height="80"></canvas>
+      </div>
+    </div>
+
+    <!-- 分析按钮 -->
+    <div class="text-center mb-6">
+      <button onclick="analyze()" id="analyzeBtn"
+        class="px-10 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition text-lg shadow-lg shadow-blue-200">
+        🔍 开始分析
+      </button>
+      <p class="text-xs text-gray-400 mt-2">匹配能力需求 + 国产/海外策略 + 价格成本 = 智能推荐</p>
+    </div>
+
+    <!-- 步骤4：推荐结果 -->
+    <div id="resultsSection" class="hidden">
+      <div class="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="w-7 h-7 rounded-full bg-green-600 text-white text-sm flex items-center justify-center font-bold">4</span>
+          <h2 class="text-lg font-semibold">最佳推荐</h2>
+        </div>
+        <div id="topRecommend" class="mb-6"></div>
+        <h3 class="text-sm font-semibold text-gray-500 mb-3">全部模型排名（按综合推荐分）</h3>
+        <div id="rankingList"></div>
+      </div>
+
+      <!-- 匹配度雷达图 -->
+      <div class="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+        <h3 class="text-sm font-semibold text-gray-500 mb-3">Top 3 模型 vs 任务需求 匹配雷达图</h3>
+        <div class="max-w-lg mx-auto">
+          <canvas id="matchRadar" height="300"></canvas>
+        </div>
+      </div>
+
+      <!-- 解释区域 -->
+      <div class="bg-blue-50 rounded-xl p-6 border border-blue-100">
+        <h3 class="font-semibold text-blue-800 mb-2">📐 推荐算法说明</h3>
+        <div class="text-sm text-blue-700 space-y-2" id="algoExplain"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========== 预设任务模板 ==========
+    const PRESETS = [
+      { name: '🐍 Python爬虫+数据分析', task: '用Python写爬虫抓取数据，做数据清洗、统计分析和可视化报告',
+        weights: { reasoning: 15, coding: 40, knowledge: 15, math: 20, multilingual: 5, multimodal: 5 } },
+      { name: '📝 中文内容创作', task: '撰写公众号文章、小红书笔记、品牌文案，要求文风自然有网感',
+        weights: { reasoning: 10, coding: 5, knowledge: 25, math: 0, multilingual: 50, multimodal: 10 },
+        regionHint: 'domestic' },
+      { name: '🔬 学术研究', task: '阅读大量英文论文，提炼核心观点，辅助论文写作和文献综述',
+        weights: { reasoning: 30, coding: 5, knowledge: 35, math: 10, multilingual: 15, multimodal: 5 } },
+      { name: '📊 商业数据分析', task: '分析公司经营数据，做财务报表解读，产出商业洞察和策略建议',
+        weights: { reasoning: 35, coding: 10, knowledge: 25, math: 20, multilingual: 5, multimodal: 5 } },
+      { name: '💻 全栈Web开发', task: '从零搭建一个网站，前端+后端+数据库，需要写大量代码和调试',
+        weights: { reasoning: 20, coding: 50, knowledge: 15, math: 5, multilingual: 5, multimodal: 5 } },
+      { name: '🤖 AI Agent开发', task: '构建自主Agent系统，能调用工具、执行多步任务、记忆对话上下文',
+        weights: { reasoning: 35, coding: 30, knowledge: 15, math: 5, multilingual: 10, multimodal: 5 } },
+      { name: '🌐 多语言翻译+本地化', task: '翻译技术文档、产品说明，需要中英日韩多语言，保持专业术语准确',
+        weights: { reasoning: 10, coding: 0, knowledge: 20, math: 0, multilingual: 60, multimodal: 10 },
+        regionHint: 'domestic' },
+      { name: '🎨 多模态内容生产', task: '图文结合创作，识别图片内容生成描述，制作信息图和插画',
+        weights: { reasoning: 10, coding: 5, knowledge: 15, math: 0, multilingual: 30, multimodal: 40 } },
+      { name: '🧮 数学竞赛解题', task: '做AIME/IMO级别的数学竞赛题，需要深度推理和严格证明',
+        weights: { reasoning: 35, coding: 5, knowledge: 10, math: 45, multilingual: 5, multimodal: 0 } },
+      { name: '⚖️ 法律文书审查', task: '审查合同条款，对比法律条文，出具合规意见书',
+        weights: { reasoning: 40, coding: 0, knowledge: 35, math: 5, multilingual: 15, multimodal: 5 } }
+    ];
+
+    const DIMENSIONS = ['reasoning','coding','knowledge','math','multilingual','multimodal'];
+    const DIM_LABELS = { reasoning:'🧠 推理', coding:'💻 编程', knowledge:'📚 知识', math:'🔢 数学', multilingual:'🌐 多语言', multimodal:'👁️ 多模态' };
+    const DIM_COLORS = ['#EF4444','#3B82F6','#10B981','#F59E0B','#8B5CF6','#EC4899'];
+
+    const REGION_OPTIONS = [
+      { id:'domestic', icon:'🇨🇳', title:'国内模型优先', desc:'数据不出境·低延迟·中文更强·合规审查', short:'国内优先' },
+      { id:'global', icon:'🌍', title:'全球模型优先', desc:'能力最强·生态成熟·前沿技术·英文一流', short:'全球优先' },
+      { id:'auto', icon:'⚖️', title:'自动判断', desc:'智能体根据任务内容自动分析该用哪边的模型', short:'自动判断' }
+    ];
+
+    // ========== 状态 ==========
+    let currentTask = '';
+    let currentWeights = { reasoning:17, coding:17, knowledge:17, math:16, multilingual:17, multimodal:16 };
+    let currentRegion = 'auto';
+    let autoDetectedRegion = null;
+
+    // ========== 渲染 ==========
+    function renderRegionOptions() {
+      const c = document.getElementById('regionOptions');
+      c.innerHTML = REGION_OPTIONS.map(o => `
+        <div class="region-option rounded-xl p-4 border-2 bg-white ${currentRegion===o.id?'checked border-blue-500 bg-blue-50':'border-gray-200'}"
+             onclick="selectRegion('${o.id}')" id="region_${o.id}">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">${o.icon}</span>
+            <span class="font-semibold text-sm">${o.title}</span>
+            ${currentRegion===o.id?'<span class="ml-auto w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">✓</span>':''}
+          </div>
+          <p class="text-xs text-gray-500">${o.desc}</p>
+        </div>
+      `).join('');
+    }
+
+    function selectRegion(id) {
+      currentRegion = id;
+      renderRegionOptions();
+      document.getElementById('regionAutoBadge').style.display = (id === 'auto') ? 'inline-block' : 'none';
+      runAutoJudgment();
+      updateRegionHint();
+    }
+
+    function renderSliders() {
+      const c = document.getElementById('slidersContainer');
+      c.innerHTML = DIMENSIONS.map(d =>
+        `<div class="flex items-center gap-3">
+          <span class="text-sm w-20 flex-shrink-0">${DIM_LABELS[d]}</span>
+          <input type="range" min="0" max="100" value="${currentWeights[d]}" oninput="updateWeight('${d}', this.value)" class="flex-1">
+          <span class="text-sm font-mono w-10 text-right text-gray-600" id="val_${d}">${currentWeights[d]}%</span>
+        </div>`
+      ).join('');
+      updateSum();
+      drawWeightChart();
+    }
+
+    function renderPresets() {
+      const c = document.getElementById('presetContainer');
+      c.innerHTML = PRESETS.map((p,i) =>
+        `<button onclick="selectPreset(${i})" class="preset-btn px-3 py-2 text-xs rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 text-gray-700" data-idx="${i}">${p.name}</button>`
+      ).join('');
+    }
+
+    function selectPreset(idx) {
+      const p = PRESETS[idx];
+      currentWeights = JSON.parse(JSON.stringify(p.weights));
+      document.getElementById('taskInput').value = p.task;
+      currentTask = p.task;
+      if (p.regionHint) selectRegion(p.regionHint);
+      renderSliders();
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('bg-blue-100','border-blue-400'));
+      document.querySelector(`.preset-btn[data-idx="${idx}"]`).classList.add('bg-blue-100','border-blue-400');
+      runAutoJudgment();
+      updateRegionHint();
+    }
+
+    function updateWeight(dim, val) {
+      currentWeights[dim] = parseInt(val);
+      document.getElementById('val_'+dim).textContent = val + '%';
+      updateSum();
+      drawWeightChart();
+      runAutoJudgment();
+      updateRegionHint();
+    }
+
+    function updateSum() {
+      const sum = DIMENSIONS.reduce((s,d) => s + currentWeights[d], 0);
+      const el = document.getElementById('weightSum');
+      el.textContent = '合计: ' + sum + '%';
+      el.className = 'text-xs ml-auto font-semibold ' + (sum === 100 ? 'text-green-600' : 'text-red-500');
+    }
+
+    function onTaskInput() {
+      currentTask = document.getElementById('taskInput').value.trim();
+      runAutoJudgment();
+      updateRegionHint();
+    }
+
+    // ========== 自动判断国产/海外 ==========
+    function runAutoJudgment() {
+      if (currentRegion !== 'auto') { autoDetectedRegion = null; return; }
+      const task = currentTask || document.getElementById('taskInput').value.trim();
+      const mlWeight = currentWeights.multilingual;
+
+      // 中文场景关键词
+      const domesticKeywords = ['中文','国内','微信','企业微信','钉钉','小红书','公众号','微博','抖音','快手','A股','沪深','淘宝','京东','华为','小米','OPPO','vivo','腾讯','阿里','百度','字节','国内用户','国内业务','本土化','国内落地'];
+      // 海外场景关键词
+      const globalKeywords = ['国际','海外','英文论文','English','global','世界','跨境','出海','全球','国际','多国','欧美','日本','韩国'];
+
+      const domesticHits = domesticKeywords.filter(k => task.includes(k)).length;
+      const globalHits = globalKeywords.filter(k => task.includes(k)).length;
+
+      let reason = '';
+      // 多语言权重 > 30% 且任务含中文场景 → 国产
+      if (mlWeight > 30 && domesticHits >= 1) {
+        autoDetectedRegion = 'domestic';
+        reason = '任务含中文场景且多语言权重高，国产模型中文更优';
+      } else if (mlWeight > 30) {
+        autoDetectedRegion = 'domestic';
+        reason = '多语言权重超过30%，建议用国产模型（中文能力天然更强）';
+      } else if (domesticHits >= 2) {
+        autoDetectedRegion = 'domestic';
+        reason = `任务含${domesticHits}处国内关键词（如${domesticKeywords.filter(k=>task.includes(k)).slice(0,2).join('、')}），建议国内模型`;
+      } else if (globalHits >= 2) {
+        autoDetectedRegion = 'global';
+        reason = `任务含${globalHits}处海外/国际化关键词，建议全球模型`;
+      } else if (globalHits >= 1) {
+        autoDetectedRegion = 'global';
+        reason = '任务涉及海外/英文场景，全球模型更合适';
+      } else {
+        autoDetectedRegion = 'balanced';
+        reason = '未检测到明确的国内/海外倾向，默认不限区域，按能力+价格排序';
+      }
+      document.getElementById('regionAutoBadge').style.display = 'inline-block';
+      document.getElementById('regionAutoBadge').textContent = autoDetectedRegion==='domestic'?'→ 倾向国产' : autoDetectedRegion==='global'?'→ 倾向全球' : '→ 不限区域';
+    }
+
+    function updateRegionHint() {
+      const hint = document.getElementById('regionHint');
+      if (currentRegion === 'domestic') {
+        hint.innerHTML = '✅ <strong>国内优先模式：</strong>国产模型 +10% 匹配加分，海外模型 -5%。适合：国内业务、中文场景、需数据合规';
+      } else if (currentRegion === 'global') {
+        hint.innerHTML = '✅ <strong>全球优先模式：</strong>海外顶级模型 +3% 能力加成。适合：英文场景、前沿研究、追求最强性能';
+      } else {
+        if (autoDetectedRegion === 'domestic') {
+          hint.innerHTML = '🤖 <strong>智能体判断：</strong>' + (autoDetectedRegion==='domestic'?'检测到国内场景，自动倾向国产模型。不强制，最终按排名推荐。':'检测到海外场景，自动倾向全球模型。') + ' 你可以手动切换上方选项。';
+        } else if (autoDetectedRegion === 'balanced') {
+          hint.innerHTML = '🤖 <strong>智能体判断：</strong>未检测到明确倾向，不限区域，按能力+价格自然排序。你可以手动切换上方选项。';
+        } else {
+          hint.innerHTML = '🤖 <strong>智能体判断：</strong>检测到海外场景，自动倾向全球模型。你可以手动切换上方选项。';
+        }
+      }
+    }
+
+    // ========== 权重柱状图 ==========
+    let weightChart = null;
+    function drawWeightChart() {
+      const ctx = document.getElementById('weightChart');
+      if (weightChart) weightChart.destroy();
+      weightChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: DIMENSIONS.map(d => DIM_LABELS[d]),
+          datasets: [{
+            data: DIMENSIONS.map(d => currentWeights[d]),
+            backgroundColor: DIM_COLORS.map(c => c+'99'),
+            borderColor: DIM_COLORS,
+            borderWidth: 2,
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { max: 60, ticks: { callback: v => v+'%' }, grid: { color: '#f3f4f6' } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    // ========== API 配置 ==========
+    // 本地开发用 localhost:8000，Vercel 部署用同域 /api
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000'
+      : '';
+
+    // ========== 核心分析（调用后端 API） ==========
+    async function analyze() {
+      const task = document.getElementById('taskInput').value.trim();
+      if (task) currentTask = task;
+      if (!currentTask) { alert('请先输入任务描述或选择一个模板'); return; }
+
+      document.getElementById('resultsSection').classList.remove('hidden');
+      document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('analyzeBtn').textContent = '⏳ 分析中...';
+      document.getElementById('analyzeBtn').disabled = true;
+
+      // 确定实际区域策略
+      let effectiveRegion = currentRegion;
+      if (currentRegion === 'auto') {
+        runAutoJudgment();
+        effectiveRegion = autoDetectedRegion === 'domestic' ? '国产'
+          : autoDetectedRegion === 'global' ? '海外' : 'auto';
+      }
+
+      const sum = DIMENSIONS.reduce((s,d) => s + currentWeights[d], 0);
+      const weights = {};
+      DIMENSIONS.forEach(d => { weights[d] = currentWeights[d] / (sum || 1); });
+
+      try {
+        const res = await fetch(`${API_BASE}/api/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            task_description: currentTask,
+            weights: currentWeights,
+            prefer_region: effectiveRegion
+          })
+        });
+
+        if (!res.ok) throw new Error('API 请求失败: ' + res.status);
+        const json = await res.json();
+        const results = json.data || [];
+
+        if (results.length === 0) {
+          document.getElementById('topRecommend').innerHTML = '<p class="text-red-500">暂无推荐结果</p>';
+          return;
+        }
+
+        // 补充完整模型信息用于渲染（后端只返回核心字段）
+        // 同时拉取模型列表获取完整数据
+        const modelsRes = await fetch(`${API_BASE}/api/models`);
+        const modelsJson = await modelsRes.json();
+        const allModels = modelsJson.data || [];
+
+        const enriched = results.map(r => {
+          const full = allModels.find(m => m.id === r.id) || {};
+          return {
+            ...r,
+            ...full,
+            match_score: r.match_score,
+            finalScore: r.match_score,
+            adjustedMatch: r.match_score,
+            region: r.region || full.region || '',
+            pricePerM: r.price_per_m || full.price_per_m || 0,
+            vendor: r.vendor || full.vendor || '',
+            vendorColor: full.vendor_color || 'gray',
+            regionNote: r.reason || '',
+            strengths: {
+              reasoning: full.strength_reasoning || 0,
+              coding: full.strength_coding || 0,
+              knowledge: full.strength_knowledge || 0,
+              math: full.strength_math || 0,
+              multilingual: full.strength_multilingual || 0,
+              multimodal: full.strength_multimodal || 0
+            }
+          };
+        });
+
+        const topModels = enriched.slice(0, 3);
+        renderTopRecommend(enriched[0], weights, effectiveRegion !== 'auto');
+        renderRanking(enriched, effectiveRegion !== 'auto');
+        drawMatchRadar(topModels, weights);
+        updateAlgoExplain(effectiveRegion);
+
+        document.getElementById('analyzeBtn').textContent = '🔄 重新分析';
+        document.getElementById('analyzeBtn').disabled = false;
+
+      } catch (err) {
+        console.error('分析失败:', err);
+        document.getElementById('topRecommend').innerHTML =
+          '<p class="text-red-500">⚠️ 分析失败，请确认后端服务已启动。<br><small>本地开发：在 backend 目录运行 `python main.py`</small></p>';
+        document.getElementById('analyzeBtn').textContent = '🔍 重试';
+        document.getElementById('analyzeBtn').disabled = false;
+      }
+    }
+
+    function updateAlgoExplain(region) {
+      const el = document.getElementById('algoExplain');
+      let regionExplain = '';
+      if (region === 'domestic' || region === '国产') {
+        regionExplain = '<p><strong>🇨🇳 区域策略（国内优先）：</strong>国产模型匹配分 ×1.10，海外模型 ×0.95。反映国内场景的数据合规、低延迟、中文优势。</p>';
+      } else if (region === 'global' || region === '海外') {
+        regionExplain = '<p><strong>🌍 区域策略（全球优先）：</strong>海外顶级模型匹配分 ×1.03。反映前沿能力和生态成熟度优势。</p>';
+      } else {
+        regionExplain = '<p><strong>⚖️ 区域策略（不限）：</strong>不进行区域修正，完全按能力匹配+价格排序。</p>';
+      }
+      el.innerHTML = `
+        <p><strong>① 匹配得分</strong> = Σ(模型各维度能力分 × 任务各维度权重%) / 100</p>
+        ${regionExplain}
+        <p><strong>② 性价比修正</strong> = 价格低于中位数(~$5.5/M)时奖励加分，越高越省</p>
+        <p><strong>③ 综合推荐分</strong> = 70% 调整后匹配 + 30% 性价比修正，满分 100</p>
+        <p class="text-blue-500 text-xs mt-2">💡 能力越匹配分越高，价格越便宜加分越多，区域策略根据你的场景偏好调整。</p>
+      `;
+    }
+
+    function renderTopRecommend(model, weights, regionActive) {
+      const c = document.getElementById('topRecommend');
+      const topReasons = [];
+      DIMENSIONS.forEach(d => {
+        if (weights[d] > 0.12 && model.strengths[d] >= 80) topReasons.push(DIM_LABELS[d]);
+      });
+      if (model.regionNote) topReasons.push(model.regionNote.replace(/[+-]\d+%/,''));
+
+      const regionBadge = model.region === '国产'
+        ? `<span class="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">🇨🇳 国产</span>`
+        : `<span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">🌍 海外</span>`;
+
+      const regionNoteHtml = model.regionNote
+        ? `<span class="text-xs px-2 py-0.5 rounded-full ${model.regionNote.includes('加成')||model.regionNote.includes('优先')?'bg-amber-50 text-amber-700 border border-amber-200':'bg-gray-50 text-gray-500 border border-gray-200'}">${model.regionNote}</span>`
+        : '';
+
+      c.innerHTML = `
+        <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border-2 border-green-300">
+          <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div class="flex-shrink-0 w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl font-bold text-green-700">🏆</div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xl font-bold text-gray-900">${model.name}</span>
+                ${regionBadge}
+                ${regionNoteHtml}
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background:${model.vendorColor==='coral'?'#fef3c7':'#e0e7ff'};color:${model.vendorColor==='coral'?'#92400e':'#1e40af'}">${model.vendor}</span>
+              </div>
+              <p class="text-sm text-gray-600 mt-1">综合推荐分 <strong class="text-green-600 text-lg">${model.finalScore}</strong> / 100</p>
+              <p class="text-sm text-gray-600">原始匹配度 <strong>${model.matchScore}%</strong> → 调整后匹配 <strong>${model.adjustedMatch}%</strong> · API价格 <strong>$${model.pricePerM}/M tok</strong></p>
+              <div class="flex flex-wrap gap-1 mt-2">
+                ${topReasons.slice(0,4).map(r => `<span class="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">${r}</span>`).join('')}
+              </div>
+            </div>
+            <div class="flex-shrink-0 text-center">
+              <div class="text-sm text-gray-500">月费用估算</div>
+              <div class="text-2xl font-bold text-green-700">¥${Math.round(model.pricePerM * 3 * 7.2 * 10) / 10}</div>
+              <div class="text-xs text-gray-400">3M tok/月, ¥7.2/$</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRanking(results, regionActive) {
+      const c = document.getElementById('rankingList');
+      const best = results[0].finalScore;
+      c.innerHTML = results.map((m, i) => {
+        const pct = Math.round((m.finalScore / best) * 100);
+        const barColor = i === 0 ? '#22c55e' : i < 3 ? '#3b82f6' : '#d1d5db';
+        const regionFlag = m.region === '国产' ? '🇨🇳' : '🌍';
+        const scoreChange = m.adjustedMatch !== m.matchScore
+          ? (m.adjustedMatch > m.matchScore ? 'text-green-600' : 'text-red-500') + ' text-xs'
+          : '';
+        return `
+          <div class="result-row flex items-center gap-3 py-3 px-3 rounded-lg ${i===0?'bg-green-50':''}">
+            <span class="w-6 text-center font-bold text-sm ${i===0?'text-green-600':'text-gray-400'}">${i+1}</span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs">${regionFlag}</span>
+                <span class="font-semibold text-sm">${m.name}</span>
+                <span class="text-xs text-gray-400">${m.vendor}</span>
+                ${m.regionNote ? `<span class="text-xs text-gray-400">(${m.regionNote})</span>` : ''}
+              </div>
+              <div class="flex items-center gap-2 mt-1">
+                <div class="flex-1 h-2 bg-gray-100 rounded-full">
+                  <div class="h-2 rounded-full bar-fill" style="width:${pct}%;background:${barColor}"></div>
+                </div>
+                <span class="text-xs font-mono font-semibold w-12 text-right">${m.finalScore}</span>
+              </div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-sm font-mono font-semibold">¥${Math.round(m.pricePerM*7.2*10)/10}/M</div>
+              <div class="text-xs text-gray-400">匹配${m.adjustedMatch}%</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ========== 匹配度雷达图 ==========
+    let matchRadar = null;
+    function drawMatchRadar(topModels, weights) {
+      const ctx = document.getElementById('matchRadar');
+      if (matchRadar) matchRadar.destroy();
+
+      const labels = DIMENSIONS.map(d => DIM_LABELS[d]);
+      const modelColors = ['#22c55e','#3b82f6','#f59e0b'];
+      const datasets = topModels.map((m,i) => ({
+        label: m.name + ` (${m.finalScore}分) ${m.region==='国产'?'🇨🇳':'🌍'}`,
+        data: DIMENSIONS.map(d => m.strengths[d]),
+        borderColor: modelColors[i],
+        backgroundColor: modelColors[i]+'22',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: modelColors[i],
+      }));
+
+      datasets.push({
+        label: '📋 任务需求权重',
+        data: DIMENSIONS.map(d => (weights[d] || 0) * 100),
+        borderColor: '#ef4444',
+        backgroundColor: '#ef444422',
+        borderWidth: 2,
+        borderDash: [5,5],
+        pointRadius: 3,
+        pointBackgroundColor: '#ef4444',
+      });
+
+      matchRadar = new Chart(ctx, {
+        type: 'radar',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          scales: {
+            r: {
+              min: 0, max: 100,
+              ticks: { stepSize: 20, backdropColor: 'transparent' },
+              pointLabels: { font: { size: 12 } }
+            }
+          },
+          plugins: {
+            legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15, font:{size:11} } }
+          }
+        }
+      });
+    }
+
+    // ========== 启动 ==========
+    renderRegionOptions();
+    renderPresets();
+    renderSliders();
+    updateRegionHint();
+  </script>
+</body>
+</html>

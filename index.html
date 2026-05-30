@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Navigator - 大模型选型助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .card { transition: transform 0.15s, box-shadow 0.15s; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+  <!-- 导航栏 -->
+  <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span style="font-size:20px">🧭</span>
+        <span class="font-semibold text-lg text-blue-700">LLM Navigator</span>
+      </div>
+      <div class="hidden md:flex items-center gap-6 text-sm text-gray-600">
+        <a href="index.html" class="hover:text-blue-600 text-blue-600 font-semibold">首页</a>
+        <a href="ranking.html" class="hover:text-blue-600">排行榜</a>
+        <a href="compare.html" class="hover:text-blue-600">雷达对比</a>
+        <a href="task-agent.html" class="hover:text-blue-600">任务分析</a>
+        <a href="wizard.html" class="hover:text-blue-600">选型向导</a>
+        <a href="calculator.html" class="hover:text-blue-600">成本计算</a>
+      </div>
+      <button id="menu-btn" class="md:hidden text-gray-600" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="md:hidden hidden bg-white border-t border-gray-100 px-4 py-2">
+      <a href="index.html" class="block py-2 text-sm text-blue-600 font-semibold">首页</a>
+      <a href="ranking.html" class="block py-2 text-sm text-gray-600">排行榜</a>
+      <a href="compare.html" class="block py-2 text-sm text-gray-600">雷达对比</a>
+      <a href="task-agent.html" class="block py-2 text-sm text-gray-600">任务分析</a>
+      <a href="wizard.html" class="block py-2 text-sm text-gray-600">选型向导</a>
+      <a href="calculator.html" class="block py-2 text-sm text-gray-600">成本计算</a>
+    </div>
+  </nav>
+
+  <!-- Hero 区 -->
+  <section class="bg-white py-16 md:py-24">
+    <div class="max-w-6xl mx-auto px-4 text-center">
+      <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+        别再盲目选大模型了
+      </h1>
+      <p class="text-lg md:text-xl text-gray-500 mb-2">
+        根据场景、预算、语言，30秒找到最优解
+      </p>
+      <p class="text-sm text-gray-400 mb-8" id="data-source">
+        基于 BenchLM · LMArena · Artificial Analysis 多源数据实时对比
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="wizard.html" class="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+          开始选型 →
+        </a>
+        <a href="ranking.html" class="border border-gray-300 px-6 py-3 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+          查看排行榜
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 今日Top3 热点卡片 -->
+  <section class="max-w-6xl mx-auto px-4 py-12">
+    <h2 class="text-xl font-semibold mb-6">今日 Top 3 大模型</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="top3-cards">
+      <div class="text-center text-gray-400 py-12">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 全部模型卡片列表 -->
+  <section class="max-w-6xl mx-auto px-4 py-8">
+    <h2 class="text-xl font-semibold mb-6">全部模型</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="model-list">
+      <div class="text-center text-gray-400 py-12">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer class="border-t border-gray-200 mt-12 py-8 text-center text-sm text-gray-400">
+    <p>LLM Navigator · 大模型选型助手 · 数据仅供参考</p>
+  </footer>
+
+  <script>
+    // 本地开发用 localhost:8000，Vercel 部署用同域 /api
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000'
+      : '';
+
+    async function loadModels() {
+      try {
+        const res = await fetch(`${API_BASE}/api/models`);
+        if (!res.ok) throw new Error('API 请求失败');
+        const json = await res.json();
+        const MODELS = json.data || json;
+
+        // 渲染 Top3
+        const top3 = [...MODELS].sort((a,b) => b.score - a.score).slice(0, 3);
+        const badges = ['🥇 综合最强', '🥈 性价比王', '🥉 中文最佳'];
+        document.getElementById('top3-cards').innerHTML = top3.map((m, i) => `
+          <div class="card bg-white border border-gray-200 rounded-xl p-5">
+            <div class="text-xs text-gray-400 mb-2">${badges[i]}</div>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="font-semibold text-lg text-gray-900">${m.name}</span>
+              <span class="text-xs bg-${m.vendor_color || 'gray'}-100 text-${m.vendor_color || 'gray'}-700 px-2 py-0.5 rounded">${m.vendor}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div class="text-gray-400 text-xs">综合评分</div>
+                <div class="font-semibold text-blue-600">${m.score}</div>
+              </div>
+              <div>
+                <div class="text-gray-400 text-xs">价格/百万token</div>
+                <div class="font-semibold text-green-600">$${m.price_per_m}</div>
+              </div>
+              <div>
+                <div class="text-gray-400 text-xs">上下文</div>
+                <div class="font-medium">${m.context}</div>
+              </div>
+              <div>
+                <div class="text-gray-400 text-xs">适用场景</div>
+                <div class="text-xs text-gray-600">${(m.tags || []).slice(0,2).join(' · ')}</div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // 渲染全部模型列表
+        document.getElementById('model-list').innerHTML = MODELS.map(m => `
+          <div class="card bg-white border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-semibold text-gray-900">${m.name}</span>
+              <span class="text-xs bg-${m.vendor_color || 'gray'}-100 text-${m.vendor_color || 'gray'}-700 px-2 py-0.5 rounded">${m.vendor}</span>
+            </div>
+            <div class="flex gap-4 text-sm mb-2">
+              <div><span class="text-gray-400 text-xs">评分 </span><span class="font-medium text-blue-600">${m.score}</span></div>
+              <div><span class="text-gray-400 text-xs">价格 </span><span class="font-medium text-green-600">$${m.price_per_m}/M</span></div>
+              <div><span class="text-gray-400 text-xs">参数 </span><span class="text-gray-700">${m.params || '—'}</span></div>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              ${(m.tags || []).map(t => `<span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${t}</span>`).join('')}
+            </div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        console.error('加载模型数据失败:', err);
+        document.getElementById('top3-cards').innerHTML =
+          '<div class="text-red-400 text-center py-12">⚠️ 无法连接后端 API，请确认后端服务已启动。<br><small>本地开发：启动 `cd backend && uvicorn main:app --reload`</small></div>';
+        document.getElementById('model-list').innerHTML = '';
+      }
+    }
+
+    loadModels();
+  </script>
+</body>
+</html>
