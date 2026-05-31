@@ -1,0 +1,7 @@
+# Cloudflare Pages 配置
+# 用于 Cloudflare Pages 部署，不影响 Vercel
+name = "llm-navigator"
+compatibility_date = "2025-05-31"
+
+# Pages 不需要 workers 配置，只需指明构建输出目录
+# 纯静态网站，Pages 直接部署根目录
