@@ -188,25 +188,24 @@ function selectClear() { selectedModels.clear(); buildSelector(); refreshAll(); 
 // 主雷达图
 // ========================
 function refreshMainRadar() {
-  const canvasParent = document.getElementById('mainRadar').parentElement;
-  // 重建 canvas（Chart.js 销毁后需要新 canvas）
+  const container = document.getElementById('mainRadar').parentElement;
+  // 销毁旧图表
   if (mainChart) { mainChart.destroy(); mainChart = null; }
-  document.getElementById('mainRadar').remove();
-  const c = document.createElement('canvas');
-  c.id = 'mainRadar'; c.height = 400;
-  canvasParent.appendChild(c);
 
   const selected = MODELS.filter(m => selectedModels.has(m.id));
   if (selected.length === 0) {
-    canvasParent.innerHTML = '<div class="text-center py-16 text-gray-400 text-sm">请在上方选择至少1个模型</div>';
+    container.innerHTML = '<div class="text-center py-16 text-gray-400 text-sm">请在上方选择至少1个模型</div><canvas id="mainRadar" height="400"></canvas>';
     return;
+  }
+
+  // 确保 canvas 存在
+  if (!document.getElementById('mainRadar')) {
+    container.innerHTML = '<canvas id="mainRadar" height="400"></canvas>';
   }
 
   const datasets = selected.map((m,i) => {
     const cm = colors[i % colors.length];
-    const sd = (m.strength_reasoning !== undefined)
-      ? [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal]
-      : Object.values(m.strengths || {});
+    const sd = [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal];
     return {
       label: (m.region === '国产' ? '🇨🇳 ' : '🌍 ') + m.name,
       data: sd,
@@ -250,6 +249,7 @@ function refreshIndividualRadars() {
   }
   container.innerHTML = selected.map((m,i) => {
     const cid = 'ir-' + m.id;
+    const sd = [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal];
     return `<div class="bg-white border border-gray-200 rounded-xl p-3">
       <div class="flex items-center gap-2 mb-2">
         <span class="font-semibold text-sm text-gray-900">${m.name}</span>
@@ -264,9 +264,7 @@ function refreshIndividualRadars() {
 
   selected.forEach((m,i) => {
     const cm = colors[i % colors.length];
-    const sd = (m.strength_reasoning !== undefined)
-      ? [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal]
-      : Object.values(m.strengths || {});
+    const sd = [m.strength_reasoning, m.strength_coding, m.strength_knowledge, m.strength_math, m.strength_multilingual, m.strength_multimodal];
     new Chart(document.getElementById('ir-'+m.id), {
       type: 'radar',
       data: { labels: dimLabels, datasets: [{ data: sd, backgroundColor: cm.bg, borderColor: cm.border, borderWidth: 1.5, pointRadius: 2 }] },
